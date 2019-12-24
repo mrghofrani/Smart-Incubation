@@ -60,6 +60,7 @@ String username = "";
 boolean login = false;
 int state = 0;
 int current = 1;
+int logged_in_user_index = 0;
 
 void menuChanged(MenuChangeEvent changed){
     MenuItem newMenuItem=changed.to; //get the destination menu
@@ -198,6 +199,38 @@ void menuUsed(MenuUseEvent used){
       menu.toRoot();
     }
   }
+  
+    if((used.item.getName()) == "Password Change"){
+        String chp_password = "";
+        int chp_state = 0;
+        boolean finish = false;
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Enter New Password:");
+        lcd.setCursor(0,1);
+        while(!finish){
+           char key = kpd.getKey();
+            if(key){
+                if(chp_state == 0){
+                    if(key == 'e'){
+                        accounts[logged_in_user_index].password = chp_password;
+                        Serial.println("User " + accounts[logged_in_user_index].username);
+                        Serial.println("Password set to " + accounts[logged_in_user_index].password);
+                        finish = true;
+                    }
+                    else{
+                        lcd.setCursor(0,1);
+                        for(int k = 0; k < chp_password.length() ; k++)
+                            lcd.print("*");
+                        chp_password += key;
+                        lcd.print(key);
+                    }
+                }
+            }
+        }
+        if(finish)
+            menu.toRoot();
+    }
 }
 
 void setup(){
@@ -297,6 +330,7 @@ void loop(){
                 if(accounts[i].username == username){
                     if(accounts[i].password == password){
                         login = true;
+                        logged_in_user_index = i;
                         menu.toRoot();
                         Serial.println("Logged in");
                         Serial.println("Matched user " + accounts[i].username);
