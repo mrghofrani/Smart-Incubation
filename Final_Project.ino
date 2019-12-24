@@ -59,6 +59,7 @@ String password = "";
 String username = "";
 boolean login = false;
 int state = 0;
+int current = 1;
 
 void menuChanged(MenuChangeEvent changed){
     MenuItem newMenuItem=changed.to; //get the destination menu
@@ -86,6 +87,9 @@ MenuItem menu1Item2SI2 = MenuItem("Temperature");
 MenuItem menu1Item3 = MenuItem("Set Humidity");
 MenuItem menu1Item4 = MenuItem("Set Accemulator");
 MenuItem menu1Item5 = MenuItem("Set Temperature");
+
+MenuItem account_createAccount = MenuItem("Create Account");
+MenuItem account_passwordChange = MenuItem("Password Change");
 
 void menuUsed(MenuUseEvent used){
     lcd.setCursor(0,1); 
@@ -116,7 +120,84 @@ void menuUsed(MenuUseEvent used){
         lcd.setCursor(0,1);
         lcd.print("v0.0.-1 ");
     }
-    
+
+    if((used.item.getName()) == "Create Account"){
+      Serial.println("in Create Account");
+      int cr_state = 0;
+      String cr_username = "";
+      String cr_password = "";
+      boolean finish = false;
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Enter username:");
+      lcd.setCursor(0,1);
+      while(!finish){
+        char key = kpd.getKey();
+        if(key){
+          if(cr_state == 0){
+            if(key == 'e'){
+              boolean exist = false;
+              for(int k = 0; k < ACCOUNT_SIZE; k++){
+                if(accounts[k].username == cr_username){
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Username Exists");
+                  exist = true;
+                  cr_state = 3;
+                }
+              }
+              if(!exist){
+                Serial.println("in password");
+                cr_state++;
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Enter password:");
+                lcd.setCursor(0,1);
+                Serial.println("Username is" + cr_username);
+              }
+            }
+            else{
+              cr_username += key;
+              lcd.print(key);
+              Serial.println("Username is" + cr_username);
+            }
+          }
+          else if(cr_state == 1){
+              if(key == 'e'){
+                cr_state++;
+                Serial.println("Password is " + cr_password);
+              }
+              else{
+                lcd.setCursor(0,1);
+                for(int k = 0; k < cr_password.length() ; k++){
+                  lcd.print("*");
+                }
+                cr_password += key;
+                lcd.print(key);
+              }
+          }
+          if(cr_state == 2){
+            accounts[current].username = cr_username;
+            accounts[current].password = cr_password;
+            current++;
+            finish = true;
+          }
+          if(cr_state == 3){
+            if(key == 'e'){
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Enter username:");
+              lcd.setCursor(0,1);
+              cr_state = 0;
+            }
+          }
+        }
+      }
+    if(finish){
+      Serial.println("in to root");
+      menu.toRoot();
+    }
+  }
 }
 
 void setup(){
@@ -162,8 +243,15 @@ void setup(){
    menu1Item2SI2.addRight(menu1Item2SI1);
    menu1Item2SI1.addLeft(menu1Item2SI2);
    menu1Item2SI2.addLeft(menu1Item2SI1);
-    
-    Serial.begin(9600);
+
+   menu0Item2.add(account_createAccount);
+   menu0Item2.add(account_passwordChange);
+   account_createAccount.addRight(account_passwordChange);
+   account_passwordChange.addRight(account_createAccount);
+   account_createAccount.addLeft(account_passwordChange);
+   account_passwordChange.addLeft(account_createAccount);
+   
+   Serial.begin(9600);
 }
 
 void loop(){
@@ -230,7 +318,7 @@ void loop(){
     }
 
     else{
-     
+      
       if (key) {
           MenuItem currentMenu=menu.getCurrent();
           Serial.println(key);
