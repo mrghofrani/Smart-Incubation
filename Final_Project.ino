@@ -62,6 +62,8 @@ int state = 0;
 int current = 1;
 int logged_in_user_index = 0;
 
+ boolean servo_active_hatcher = false;
+
 void menuChanged(MenuChangeEvent changed){
     MenuItem newMenuItem=changed.to; //get the destination menu
     lcd.clear();
@@ -80,17 +82,19 @@ MenuItem menu0Item4 = MenuItem("Mode Setting");
 MenuItem menu1Item1 = MenuItem("Hatcher");
 MenuItem menu1Item2 = MenuItem("Setter");
 
-MenuItem menu1Item1SI1 = MenuItem("Humidity");
+MenuItem menu1Item1SI1 = MenuItem("Servomotor");
 MenuItem menu1Item1SI2 = MenuItem("Temperature");
-MenuItem menu1Item2SI1 = MenuItem("Humidity");
+MenuItem menu1Item2SI1 = MenuItem("Servomotor");
 MenuItem menu1Item2SI2 = MenuItem("Temperature");
 
-MenuItem menu1Item3 = MenuItem("Set Humidity");
-MenuItem menu1Item4 = MenuItem("Set Accemulator");
+MenuItem menu1Item4 = MenuItem("Servomotor State");
 MenuItem menu1Item5 = MenuItem("Set Temperature");
 
 MenuItem account_createAccount = MenuItem("Create Account");
 MenuItem account_passwordChange = MenuItem("Password Change");
+
+MenuItem servomotor_passive_hatcher = MenuItem("Deactive");
+MenuItem servomotor_active_hatcher = MenuItem("Active");
 
 void menuUsed(MenuUseEvent used){
     lcd.setCursor(0,1); 
@@ -231,6 +235,17 @@ void menuUsed(MenuUseEvent used){
         if(finish)
             menu.toRoot();
     }
+    
+     if((used.item.getName()) == "Active"){
+        servo_active_hatcher = true;
+        menu.toRoot();
+     }
+
+     if((used.item.getName()) == "Deactive"){
+        servo_active_hatcher = false;
+        menu.toRoot();
+     }
+     
 }
 
 void setup(){
@@ -283,7 +298,14 @@ void setup(){
    account_passwordChange.addRight(account_createAccount);
    account_createAccount.addLeft(account_passwordChange);
    account_passwordChange.addLeft(account_createAccount);
-   
+
+   menu1Item1SI1.add(servomotor_active_hatcher);
+   menu1Item1SI1.add(servomotor_passive_hatcher);
+   servomotor_passive_hatcher.addRight(servomotor_active_hatcher);
+   servomotor_active_hatcher.addRight(servomotor_passive_hatcher);
+   servomotor_passive_hatcher.addLeft(servomotor_active_hatcher);
+   servomotor_active_hatcher.addLeft(servomotor_passive_hatcher);
+
    Serial.begin(9600);
 }
 
