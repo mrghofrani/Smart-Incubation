@@ -1,3 +1,4 @@
+#include <Servo.h>
 #include <LiquidCrystal.h>
 #include <MenuBackend.h>
 #include <Keypad.h>
@@ -61,8 +62,81 @@ boolean login = false;
 int state = 0;
 int current = 1;
 int logged_in_user_index = 0;
+int setter_temperature = 100000;
+int hatcher_temperature = 100000;
+int temperature = 1000;
+int servo_motor_status = false;
+int system_temp = 0;
+int servo_degree = 0;
+int offset = 0;
+int OFFSET = 5;
+int LIMIT = 23;
 
- boolean servo_active_hatcher = false;
+unsigned long CURRENT = 0;
+unsigned long DURATION = 10000;
+
+boolean servo_active_hatcher = false;
+boolean servo_active_setter = true;
+boolean enable = false;
+
+int BUZZERPORT = 10;
+int SERVOPORT = 3;
+Servo servomotor; 
+
+
+int update_temperature(){
+     // Calculating temperature
+    float rawVoltage = analogRead(A0);
+    float millivolts = (rawVoltage / 1024.0) * 3300;
+    float celsius = millivolts / 10;
+    return celsius;
+}
+
+void begin_hatcher(){
+   temperature = hatcher_temperature;
+   servo_motor_status = servo_active_hatcher;
+}
+
+void set_servomotor_status(){
+  Serial.println("before if rotate");
+  Serial.print("Servo degree");
+  Serial.println(servo_degree);
+  if(servo_motor_status){
+    Serial.println("Should rotate");
+    servo_degree += OFFSET;
+    if(servo_degree >= 180){
+      OFFSET = -OFFSET;
+    }
+    if(servo_degree <= 0){
+      OFFSET = -OFFSET;
+    }
+      servomotor.write(servo_degree);
+  }
+  delay(200);
+  return;
+}
+
+void update_status(){
+  if(enable){
+         system_temp = update_temperature();
+         if (system_temp > temperature)
+           digitalWrite(BUZZERPORT, HIGH);
+         else
+           digitalWrite(BUZZERPORT, LOW);
+           
+         if (system_temp < LIMIT)
+           digitalWrite(LED_BUILTIN, HIGH);
+         else
+           digitalWrite(LED_BUILTIN, LOW);
+           
+         set_servomotor_status();
+         if(millis() - CURRENT >= DURATION){
+          CURRENT = millis();
+          begin_hatcher();
+          
+        }
+      }
+}
 
 void menuChanged(MenuChangeEvent changed){
     MenuItem newMenuItem=changed.to; //get the destination menu
@@ -78,14 +152,15 @@ MenuItem menu0Item1 = MenuItem("Display");
 MenuItem menu0Item2 = MenuItem("Account");
 MenuItem menu0Item3 = MenuItem("Exit");
 MenuItem menu0Item4 = MenuItem("Mode Setting");
+MenuItem enable_item = MenuItem("Enable");
 
 MenuItem menu1Item1 = MenuItem("Hatcher");
 MenuItem menu1Item2 = MenuItem("Setter");
 
 MenuItem menu1Item1SI1 = MenuItem("Servomotor");
-MenuItem menu1Item1SI2 = MenuItem("Temperature");
+MenuItem menu1Item1SI2 = MenuItem("Hatcher Temp");
 MenuItem menu1Item2SI1 = MenuItem("Servomotor");
-MenuItem menu1Item2SI2 = MenuItem("Temperature");
+MenuItem menu1Item2SI2 = MenuItem("Setter Temp");
 
 MenuItem menu1Item4 = MenuItem("Servomotor State");
 MenuItem menu1Item5 = MenuItem("Set Temperature");
@@ -96,6 +171,9 @@ MenuItem account_passwordChange = MenuItem("Password Change");
 MenuItem servomotor_passive_hatcher = MenuItem("Deactive");
 MenuItem servomotor_active_hatcher = MenuItem("Active");
 
+MenuItem servomotor_passive_setter = MenuItem("Deactivate");
+MenuItem servomotor_active_setter = MenuItem("Activate");
+
 void menuUsed(MenuUseEvent used){
     lcd.setCursor(0,1); 
     
@@ -104,18 +182,27 @@ void menuUsed(MenuUseEvent used){
     if ((used.item.getName()) == "Display"){
 
         lcd.setCursor(0,0);
-          lcd.print("Temp Humd Deg");
-          lcd.setCursor(0,1);
-          // TODO: humidity temperature degree
+        lcd.print("Temp Humd Deg");
+        lcd.setCursor(0,1);
+        lcd.print("               ");
         while(true) {
           char key = kpd.getKey();
-          Serial.print("here in display");
             if ( key == 'x'){
                 menu.moveUp();
                 break;
             }
+            lcd.setCursor(0,1);
+            lcd.print("               ");
+            lcd.setCursor(0,1);        
+            int celsius = update_temperature();
+            lcd.print(celsius);
+            lcd.print("   ");
+            lcd.print("MLD");
+            lcd.print("  ");
+            lcd.print(servo_degree);
+            set_servomotor_status();
+            update_status();
           }
-        delay(1000);
     }
     if ((used.item.getName()) == "Exit"){
         login = false;
@@ -197,6 +284,7 @@ void menuUsed(MenuUseEvent used){
             }
           }
         }
+        update_status();
       }
     if(finish){
       Serial.println("in to root");
@@ -231,6 +319,7 @@ void menuUsed(MenuUseEvent used){
                     }
                 }
             }
+            update_status();
         }
         if(finish)
             menu.toRoot();
@@ -245,12 +334,85 @@ void menuUsed(MenuUseEvent used){
         servo_active_hatcher = false;
         menu.toRoot();
      }
-     
+
+     if((used.item.getName()) == "Activate"){
+       servo_active_setter = true;
+       menu.toRoot();
+     }
+
+     if((used.item.getName()) == "Deactivate"){
+       servo_active_setter = false;
+       menu.toRoot();
+     }
+
+     if((used.item.getName()) == "Setter Temp"){
+        String tmp = "";
+        boolean finish = false;
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Setter Temp");
+        while(!finish){
+           char key = kpd.getKey();
+            if(key){
+              lcd.setCursor(0,1);
+                if(key == 'e'){
+                  if(tmp.length() != 0){
+                    setter_temperature = tmp.toInt();
+                    finish = true;
+                    Serial.print("setter_temperature was set to ");
+                    Serial.println(setter_temperature);
+                  }
+                }else{
+                  tmp += key;
+                  lcd.print(tmp);
+                }
+              }
+              update_status();
+        }
+        if(finish)
+            menu.toRoot();
+     }
+
+     if((used.item.getName()) == "Hatcher Temp"){
+        String tmp = "";
+        boolean finish = false;
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Hatcher Temp");
+        while(!finish){
+           char key = kpd.getKey();
+            if(key){
+                lcd.setCursor(0,1);
+                if(key == 'e'){
+                  if (tmp.length() !=0){
+                    hatcher_temperature = tmp.toInt();
+                    finish = true;
+                    Serial.print("hatcher_temperature was set to ");
+                    Serial.println(hatcher_temperature);
+                  }
+                }else{
+                  tmp += key;
+                  lcd.print(tmp);
+                }
+              }
+              update_status();
+            }
+        if(finish)
+            menu.toRoot();
+     }
+
+     if((used.item.getName()) == "Enable"){
+        CURRENT = millis();
+        temperature = setter_temperature;
+        servo_motor_status = servo_active_setter;
+        enable = true;
+        menu.toRoot();
+     }
 }
 
 void setup(){
     admin.username = "1";
-    admin.password = "2";
+    admin.password = "123";
     accounts[0] = admin;
     lcd.begin(16, 2);
 
@@ -264,11 +426,14 @@ void setup(){
     menu.getRoot().add(menu0Item2);
     menu.getRoot().add(menu0Item3);
     menu.getRoot().add(menu0Item4);
+    menu.getRoot().add(enable_item);
     menu0Item1.addRight(menu0Item2);
     menu0Item2.addRight(menu0Item3);
     menu0Item3.addRight(menu0Item4);
-    menu0Item4.addRight(menu0Item1);
-    menu0Item1.addLeft(menu0Item4);
+    menu0Item4.addRight(enable_item);
+    enable_item.addRight(menu0Item1);
+    menu0Item1.addLeft(enable_item);
+    
 
     menu0Item4.add(menu1Item1);
     menu0Item4.add(menu1Item2);
@@ -286,7 +451,7 @@ void setup(){
    menu1Item1SI2.addLeft(menu1Item1SI1);
 
    menu1Item2.add(menu1Item2SI1);
-   menu1Item2.add(menu1Item1SI2);
+   menu1Item2.add(menu1Item2SI2);
    menu1Item2SI1.addRight(menu1Item2SI2);
    menu1Item2SI2.addRight(menu1Item2SI1);
    menu1Item2SI1.addLeft(menu1Item2SI2);
@@ -306,11 +471,25 @@ void setup(){
    servomotor_passive_hatcher.addLeft(servomotor_active_hatcher);
    servomotor_active_hatcher.addLeft(servomotor_passive_hatcher);
 
+   menu1Item2SI1.add(servomotor_active_setter);
+   menu1Item2SI1.add(servomotor_passive_setter);
+   servomotor_active_setter.addRight(servomotor_passive_setter);
+   servomotor_passive_setter.addRight(servomotor_active_setter);
+   servomotor_passive_setter.addLeft(servomotor_active_setter);
+   servomotor_active_setter.addLeft(servomotor_passive_setter);
+
    Serial.begin(9600);
+   
+   pinMode(BUZZERPORT, OUTPUT); 
+   pinMode(LED_BUILTIN, OUTPUT);
+   temperature = 30;
+
+   servomotor.attach(SERVOPORT);
 }
 
 void loop(){
    char key = kpd.getKey();
+   
    if(!login){
       if(key){
         if(state == 0){
@@ -325,12 +504,14 @@ void loop(){
         }
         else if(state == 1){
             if (key == 'e'){
-              Serial.println("state 1 etner pressed");
-              state++;
-              lcd.clear();
-              lcd.setCursor(0,0);
-              lcd.print("Enter password:");
-              lcd.setCursor(0,1);
+              if(username.length() != 0){
+                state++;
+                Serial.println("state 1 enter pressed");
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Enter password:");
+                lcd.setCursor(0,1);
+              }
             }
             else{
               lcd.print(key);
@@ -340,15 +521,19 @@ void loop(){
         }
         else if (state == 2){
             if (key == 'e'){
-                state++;
+              if(password.length() != 0)
+                  state++;
             }else{
-              lcd.print("*");
+              lcd.setCursor(0,1);
+              for(int k = 0; k < password.length() ; k++)
+                  lcd.print("*");
               password += key;
-              Serial.println("Password " + password);
+              lcd.print(key);
             }
         }
         if(state == 3){
             for (int i = 0; i < ACCOUNT_SIZE; i++){
+              if(username.length()!=0){
                 if(accounts[i].username == username){
                     if(accounts[i].password == password){
                         login = true;
@@ -359,6 +544,7 @@ void loop(){
                         Serial.println("Matched pass " + accounts[i].password);
                     }
                 }
+              }
             }
            if (!login){
                   lcd.clear();
@@ -395,5 +581,6 @@ void loop(){
   //            lcd.print("Smart Incubation v0.0.-1");
           }
       }
+      update_status();
     }
 } 
